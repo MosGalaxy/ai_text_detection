@@ -35,6 +35,14 @@ def main():
     df = pd.read_csv("data/full_with_stylometric_features.csv", encoding="utf-8")
     df = df.dropna(subset=STYLE_FEATURES)
 
+    group_sizes = df.groupby(["origin", "language"]).size()
+    min_group_size = group_sizes.min()
+    print(f"Balancing classes: smallest group has {min_group_size} samples per (origin, language). "
+          f"Downsampling all groups to match.\n{group_sizes}")
+    df = df.groupby(["origin", "language"], group_keys=False).sample(
+        n=min_group_size, random_state=42
+    ).reset_index(drop=True)
+
     X_train, X_test, y_train, y_test = train_test_split(
         df, df["origin"], test_size=0.25, random_state=42, stratify=df["origin"]
     )
