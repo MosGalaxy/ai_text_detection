@@ -50,6 +50,64 @@ has become, and it's exactly the kind of result "optimization of existing
 authorship analysis methods" points toward: knowing *when* a method
 doesn't separate classes well is as informative as when it does.
 
+## Results
+
+Three runs at increasing sample size trace out a clear pattern:
+
+| Run | Sample size (per lang) | Balanced? | Test support/class | Gemini AUC | GPT-OSS AUC | Human AUC |
+|---|---|---|---|---|---|---|
+| r1 | 10 | No (human:AI ≈ 6:1) | ~5-10 | 0.789 | 0.669 | 0.933 |
+| r2 | 30 | Yes | 13 | 0.497 | 0.536 | 0.731 |
+| r3 | 60 | Yes | 27 | 0.634 | 0.589 | 0.814 |
+
+**r1 → r2**: fixing class imbalance dropped every AUC. This looked like a
+regression at first, but it wasn't — r1's high numbers came from the
+model learning to just guess the majority class (human) most of the time,
+which is easy to do well on when human samples outnumber each AI class
+6:1. r2's lower, honest numbers reflect the model actually trying to
+distinguish the three classes on equal footing.
+
+**r2 → r3**: doubling the balanced sample size (13 → 27 per class in the
+test set) raised every AUC again, this time for a legitimate reason —
+more data, less noise. This is good evidence that r2's near-chance
+Gemini/GPT-OSS AUC (0.497) was mostly a small-sample artifact, not a
+ceiling on how separable these two models' writing actually is.
+
+**r1 (before balancing, 10/lang, misleadingly high AUC):**
+![r1 confusion matrix](archive/r1_confusion.png)
+![r1 ROC](archive/r1_roc.png)
+
+**r3 (balanced, 60/lang, current best result):**
+![r3 confusion matrix](archive/r3_confusion.png)
+![r3 ROC](archive/r3_roc.png)
+
+Human-vs-AI separation is consistently the strongest signal across all
+three runs. Gemini-vs-GPT-OSS attribution is real but weaker — expected,
+since both are RLHF-tuned models producing broadly similar prose on the
+same short rewriting task.
+
+## Archive
+
+`archive/` holds snapshots from earlier runs, kept for comparison — the
+files a script actually reads/writes (`data/*.csv`, `outputs/*.png`) get
+overwritten every run, so anything worth keeping has to be copied out
+first.
+
+Naming: `r{N}_{filetype}.{ext}` — `r1`, `r2`, `r3`... in chronological
+order. See the table above for what each run's parameters were.
+
+```
+archive/
+├── r1_features.csv       # 10/lang, gemini-3.6-flash, unbalanced
+├── r1_confusion.png
+├── r1_roc.png
+├── r2_ai_samples.csv     # 30/lang, gemini-3.5-flash-lite, balanced
+├── r2_features.csv
+├── r2_confusion.png
+├── r2_roc.png
+└── ...
+```
+
 ## Honest note on sample size
 Test set support is only 13 samples per class. This is large enough to
 see the human-vs-AI signal clearly, but too small to confidently say
