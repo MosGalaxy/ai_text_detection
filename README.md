@@ -83,6 +83,46 @@ roughly ±0.07 AUC just from randomness in the train/test split — a
 reminder that a single run's numbers shouldn't be over-interpreted
 without knowing this noise band.
 
+## Diagnosing separability: data size vs. feature limitations
+
+The r3/r4 comparison above raises a natural question: is Gemini-vs-GPT-OSS
+attribution weak because 60 samples/class simply isn't enough data, or
+because the features themselves (stylometric + a paraphrase-oriented
+embedding model) lack the signal to separate two RLHF-tuned models in the
+first place? These have very different implications — one says "collect
+more data," the other says "redesign the features."
+
+`diagnose_separability.py` answers this by comparing training-set AUC
+against test-set AUC on the same run. The logic: if training AUC is also
+low, the model can't even fit the data it's seen — the features
+genuinely lack the signal, and more data won't help. If training AUC is
+high but test AUC is low, the model is overfitting a small training set
+— more data likely will help.
+
+On r4 (60/class, balanced):
+
+| Class | Train AUC | Test AUC | Gap |
+|---|---|---|---|
+| Gemini | 0.997 | 0.566 | 0.431 |
+| GPT-OSS | 0.995 | 0.527 | 0.469 |
+| Human | 0.999 | 0.777 | 0.222 |
+
+Training AUC is near-perfect across all three classes; test AUC is
+modest, with a large gap. This is the signature of **overfitting**, not
+a fundamental lack of signal. If the embedding model (`paraphrase-multilingual-MiniLM-L12-v2`) — trained to make
+paraphrases of the same content embed *closer together*, which is
+arguably counterproductive for a task that specifically needs to
+distinguish *style* between same-topic rewrites — were the real
+bottleneck, training AUC would also be low, since the model wouldn't be
+able to fit the training data well in the first place. Instead, it fits
+training data almost perfectly, meaning the ~390-dimensional feature
+space (6 stylometric + 384 embedding dimensions) has more capacity than
+60 samples/class can meaningfully constrain.
+
+This points toward **more data**, not different features, as the next
+lever to pull — which is exactly the direction the project moved in next
+(scaling to 120/class, see r5 below once available).
+
 **r1 (before balancing, 10/lang, misleadingly high AUC):**
 ![r1 confusion matrix](archive/r1_confusion.png)
 ![r1 ROC](archive/r1_roc.png)
@@ -145,7 +185,12 @@ step (see Known limitations).
 3. Extract stylometric features (`stylometric_features.py`).
 4. Balance classes, concatenate stylometric + embedding features, train a
    Logistic Regression, evaluate with one-vs-rest ROC-AUC and a
-   normalized confusion matrix (`train_classifier.py`).
+   normalized confusion matrix (`train_classifier.py`). A standalone
+   diagnostic (`diagnose_separability.py`) additionally reports
+   training-set AUC alongside test-set AUC on any saved run's features
+   file — this distinguishes "not enough data" (both train and test AUC
+   low) from "overfitting" (train AUC high, test AUC low, big gap)
+   without needing to regenerate any data.
 5. Case study (not yet implemented — see Known limitations): simplified
    statistical watermarking (`watermark_demo.py`).
 6. Streamlit demo (`app.py`).
@@ -169,6 +214,22 @@ Building this surfaced several real-world issues worth documenting:
   dropping the grouping columns from the result in a recent pandas
   version; replaced with the built-in `groupby().sample()`, which is
   both more robust and more idiomatic for this exact use case.
+- **Groq daily token limit (TPD)**: `openai/gpt-oss-120b`'s free tier
+  caps at 200,000 tokens/day, separate from its per-minute limits. Ran
+  into this generating a 120/lang batch — English completed, German was
+  cut short partway through. Unlike Gemini (Pacific time reset), Groq's
+  daily quotas reset at UTC midnight.
+- **Groq RPM limit**: also discovered `openai/gpt-oss-120b`'s free tier
+  caps at 30 requests/minute; the original 1.5s sleep interval allowed
+  ~40/minute, exceeding it. Fixed to 2.1s.
+- **Traceable pairing (`source_id`)**: originally, AI-generated rows had
+  no reference back to which human text they were rewritten from —
+  pairing relied on both files being read in the same order every time,
+  which is fragile (e.g., if the human sample pool is ever regenerated
+  or reshuffled). Added an explicit `sample_id` column to
+  `human_samples.csv` and a matching `source_id` column to
+  `ai_samples.csv`, so any AI row can always be traced back to its exact
+  source text regardless of file order.
 
 ## Known limitations
 - Small sample size (13/class in the test set) — results on Gemini vs.
