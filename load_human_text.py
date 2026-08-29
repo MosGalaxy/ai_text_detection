@@ -5,9 +5,9 @@ Same public benchmark datasets as before — see README for citations.
 """
 
 import pandas as pd
-from datasets import load_dataset
+from datasets import load_dataset  # pyright: ignore[reportMissingImports]
 
-N_PER_LANG = 60  # EN/DE only, tuned for a ~5 hour build (30 human + 30 AI per language)
+N_PER_LANG = 120  
 
 def load_human_samples():
     en = load_dataset("fancyzhx/ag_news", split="train").shuffle(seed=42).select(range(N_PER_LANG))
@@ -18,6 +18,7 @@ def load_human_samples():
         pd.DataFrame({"text": de["text"], "language": "de"}),
     ], ignore_index=True)
     df["origin"] = "human"
+    df["sample_id"] = df["language"] + "_" + df.groupby("language").cumcount().astype(str)
     df.to_csv("data/human_samples.csv", index=False, encoding="utf-8")
     print(f"Saved {len(df)} human samples to data/human_samples.csv")
     return df

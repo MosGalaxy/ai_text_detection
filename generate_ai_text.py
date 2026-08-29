@@ -16,7 +16,7 @@ import time
 import shutil
 import pandas as pd
 from google import genai
-from groq import Groq
+from groq import Groq # pyright: ignore[reportMissingImports]
 
 gemini_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY"))
 GEMINI_MODEL = "gemini-3.5-flash-lite"  # RPD=500 on free tier, confirmed via AI Studio
@@ -50,7 +50,8 @@ def generate_batch(human_df, generate_fn, source_label, sample_n_per_lang, sleep
         for _, row in subset.iterrows():
             try:
                 ai_text = generate_fn(row["text"], lang)
-                rows.append({"text": ai_text, "language": lang, "origin": source_label})
+                rows.append({"text": ai_text, "language": lang, "origin": source_label, "source_id": row["sample_id"],
+                             })
             except Exception as e:
                 print(f"[{source_label}/{lang}] skipped one sample: {e}")
             time.sleep(sleep_seconds)
@@ -67,11 +68,11 @@ def backup_if_exists(path):
 def main(sample_n_per_lang=30):
     human_df = pd.read_csv("data/human_samples.csv", encoding="utf-8")
 
-    print("Generating Gemini samples (RPD=500 on flash-lite -> 2s sleep is safe)...")
+    print("Generating Gemini samples (RPD=500 on flash-lite -> 4.5s sleep is safe)...")
     gemini_rows = generate_batch(human_df, generate_gemini, "gemini", sample_n_per_lang, sleep_seconds=4.5)
 
-    print("Generating Groq/GPT-OSS samples (fast, generous free tier -> 1.5s sleep is plenty)...")
-    groq_rows = generate_batch(human_df, generate_groq, "gpt_oss_groq", sample_n_per_lang, sleep_seconds=1.5)
+    print("Generating Groq/GPT-OSS samples (fast, generous free tier -> 2.1s sleep is plenty)...")
+    groq_rows = generate_batch(human_df, generate_groq, "gpt_oss_groq", sample_n_per_lang, sleep_seconds=2.1)
 
     ai_df = pd.DataFrame(gemini_rows + groq_rows)
 
@@ -88,4 +89,4 @@ def main(sample_n_per_lang=30):
               "Consider re-running the smaller batch before training.")
 
 if __name__ == "__main__":
-    main(sample_n_per_lang=60)
+    main(sample_n_per_lang=120) 
