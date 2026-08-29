@@ -88,4 +88,4 @@ def main(sample_n_per_lang=30):
               "Consider re-running the smaller batch before training.")
 
 if __name__ == "__main__":
-    main(sample_n_per_lang=30)
+    main(sample_n_per_lang=60)
