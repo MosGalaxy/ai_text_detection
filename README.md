@@ -56,9 +56,10 @@ Three runs at increasing sample size trace out a clear pattern:
 
 | Run | Sample size (per lang) | Balanced? | Test support/class | Gemini AUC | GPT-OSS AUC | Human AUC |
 |---|---|---|---|---|---|---|
-| r1 | 10 | No (human:AI ≈ 6:1) | ~5-10 | 0.789 | 0.669 | 0.933 |
+| r1 | 10 | No (human:AI ≈ 6:1) | not recorded | 0.789 | 0.669 | 0.933 |
 | r2 | 30 | Yes | 13 | 0.497 | 0.536 | 0.731 |
 | r3 | 60 | Yes | 27 | 0.634 | 0.589 | 0.814 |
+| r4 | 60 (same pool as r3, capped by human sample count) | Yes | 28 | 0.566 | 0.527 | 0.777 |
 
 **r1 → r2**: fixing class imbalance dropped every AUC. This looked like a
 regression at first, but it wasn't — r1's high numbers came from the
@@ -72,6 +73,15 @@ test set) raised every AUC again, this time for a legitimate reason —
 more data, less noise. This is good evidence that r2's near-chance
 Gemini/GPT-OSS AUC (0.497) was mostly a small-sample artifact, not a
 ceiling on how separable these two models' writing actually is.
+
+**r3 vs r4 (same nominal sample size)**: r4 was run after r3, with the
+same 60/lang cap still in effect (the human sample pool hadn't yet been
+expanded — see Development notes). All three AUCs dropped slightly
+(gemini: 0.634→0.566, gpt_oss_groq: 0.589→0.527, human: 0.814→0.777).
+This is useful context: at this sample size, repeated runs vary by
+roughly ±0.07 AUC just from randomness in the train/test split — a
+reminder that a single run's numbers shouldn't be over-interpreted
+without knowing this noise band.
 
 **r1 (before balancing, 10/lang, misleadingly high AUC):**
 ![r1 confusion matrix](archive/r1_confusion.png)
