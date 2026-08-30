@@ -14,11 +14,11 @@ def load_human_samples():
     de = load_dataset("community-datasets/gnad10", split="train").shuffle(seed=42).select(range(N_PER_LANG))
 
     df = pd.concat([
-        pd.DataFrame({"text": en["text"], "language": "en"}),
-        pd.DataFrame({"text": de["text"], "language": "de"}),
+        pd.DataFrame({"language": "en", "origin": "human", "text": en["text"]}),
+        pd.DataFrame({"language": "de", "origin": "human", "text": de["text"]}),
     ], ignore_index=True)
-    df["origin"] = "human"
     df["sample_id"] = df["language"] + "_" + df.groupby("language").cumcount().astype(str)
+    df = df[["sample_id", "language", "origin", "text"]]
     df.to_csv("data/human_samples.csv", index=False, encoding="utf-8")
     print(f"Saved {len(df)} human samples to data/human_samples.csv")
     return df
